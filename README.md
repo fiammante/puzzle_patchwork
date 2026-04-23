@@ -7,11 +7,26 @@ all piece boundaries render as clean single-pixel cut lines with zero mismatch.
 
 ---
 
-## Example output
+## Sample output
 
-| `--cols 5 --rows 8 --tile 450` |
-|:---:|
-| ![example](example.jpg) |
+![patchwork](patchwork.jpg)
+
+*Generated with `--cols 5 --rows 8 --tile 450` from the photos in `photos/`*
+
+---
+
+## Repository structure
+
+```
+puzzle_patchwork/
+├── code/
+│   ├── puzzle_patchwork.py   # Main mosaic generator
+│   └── resize_photos.py      # Pre-processing helper (resize + rename)
+├── photos/                   # Sample input images
+├── patchwork.jpg             # Sample output
+├── LICENSE
+└── README.md
+```
 
 ---
 
@@ -29,13 +44,34 @@ pip install Pillow numpy
 
 ---
 
-## Usage
+## Workflow
+
+### Step 1 — Prepare your photos (optional)
+
+Use `resize_photos.py` to normalise a folder of images before generating
+the mosaic — reduces file size, fixes EXIF orientation, and renames files
+to a clean numeric sequence.
 
 ```bash
-python puzzle_patchwork.py -i FOLDER -o OUTPUT [options]
+python code/resize_photos.py -i ./my_photos -o ./photos
 ```
 
-### Arguments
+| Argument | Default | Description |
+|---|---|---|
+| `--input` / `-i` | *(required)* | Source folder |
+| `--output` / `-o` | in-place | Destination folder (omit to overwrite) |
+| `--max-kb` | `500` | Maximum file size in KB |
+
+After this step every file in `photos/` will be `1.jpg`, `2.jpg`, … and
+under 500 KB, with EXIF orientation already baked in.
+
+---
+
+### Step 2 — Generate the mosaic
+
+```bash
+python code/puzzle_patchwork.py -i ./photos -o patchwork.jpg --cols 5 --rows 8 --tile 450
+```
 
 | Argument | Short | Default | Description |
 |---|---|---|---|
@@ -48,18 +84,15 @@ python puzzle_patchwork.py -i FOLDER -o OUTPUT [options]
 | `--seed` | | *random* | Integer seed for reproducibility |
 | `--bg` | | `121212` | Background hex colour |
 
-### Examples
+### More examples
 
 ```bash
-# Basic — 5×8 grid, 450 px tiles
-python puzzle_patchwork.py -i ./photos -o patchwork.jpg --cols 5 --rows 8 --tile 450
-
-# Reproducible, 30 % grayscale tiles mixed in
-python puzzle_patchwork.py -i ./photos -o patchwork.png \
+# Reproducible run, 30 % grayscale tiles mixed in
+python code/puzzle_patchwork.py -i ./photos -o patchwork.png \
     --cols 6 --rows 5 --tile 300 --gray-ratio 0.30 --seed 42
 
 # Warm dark background
-python puzzle_patchwork.py -i ./photos -o warm.jpg \
+python code/puzzle_patchwork.py -i ./photos -o warm.jpg \
     --cols 4 --rows 4 --tile 400 --bg 1a0808 --seed 7
 ```
 
@@ -94,8 +127,7 @@ blank of tile B are always the exact same curve.
 ### Pixel-perfect cut lines
 
 A `tmap` integer array records which tile owns each canvas pixel.
-Masks are stamped without dilation; any unclaimed pixels are assigned
-from the rectangular grid fallback.  The boundary is then:
+The boundary is detected as adjacent pixels with different tile indices:
 
 ```python
 h_boundary = tmap[y, x] != tmap[y+1, x]
@@ -106,10 +138,10 @@ Pure integer comparison — no floating-point geometry, no misalignment possible
 
 ### Zero-halo guarantee
 
-`tiles_rect` (the rectangle used in pass 1) is derived by centre-cropping
-`tiles_pad` (the larger padded image used in pass 2), not by re-scaling the
-source independently.  Both passes use **identical pixels** at the shared
-boundary, so there is no colour fringe around tabs.
+`tiles_rect` (pass 1 rectangle) is derived by centre-cropping `tiles_pad`
+(the larger padded image used in pass 2), not by independently re-scaling
+the source. Both passes use **identical pixels** at shared boundaries,
+so there is no colour fringe around tabs.
 
 ---
 
